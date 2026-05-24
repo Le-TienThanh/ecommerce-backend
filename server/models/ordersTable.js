@@ -11,7 +11,7 @@ export async function createOrdersTable() {
         paid_at TIMESTAMP CHECK (paid_at IS NULL OR paid_at <= CURRENT_TIMESTAMP),     
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,     
         FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE        
-         );`;
+         )`;
         await database.query(query);
     } catch (error) {
         console.error('Failed To Create Orders Table.', error);

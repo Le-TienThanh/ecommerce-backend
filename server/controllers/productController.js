@@ -57,6 +57,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = 10;
     const offset = (page - 1) * limit;
+    
 
     let conditions = [];
     let values = [];
@@ -71,15 +72,17 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     } else if (availability === 'out-of-stock') {
         conditions.push(`stock = 0`);
     }
-
     // Filter products by price
     if (price) {
+
         const [minPrice, maxPrice] = price.split('-').map(Number);
-        if (minPrice && maxPrice) {
+      
+        if (!isNaN(minPrice) && !isNaN(maxPrice)) {
             conditions.push(`price BETWEEN $${index} AND $${index + 1}`);
             values.push(minPrice, maxPrice);
             index += 2;
         }
+
     }
 
     // Filter products by category
@@ -99,7 +102,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     // Add search query
     if (search) {
         conditions.push(
-            `p.name ILIKE $${index} OR p.description ILIKE $${index})`,
+            `(p.name ILIKE $${index} OR p.description ILIKE $${index})`,
         );
         values.push(`%${search}%`);
         index++;
@@ -337,7 +340,7 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
 export const deleteReview = catchAsyncErrors(async (req, res, next) => {
     const { productId } = req.params;
     const review = await database.query(
-        `SELECT * FROM reviews WHERE product_id = $1 AND user_id = $2 RETURNING *`,
+        `DELETE FROM reviews WHERE product_id = $1 AND user_id = $2 RETURNING *`,
         [productId, req.user.id],
     );
     if (review.rows.length === 0) {

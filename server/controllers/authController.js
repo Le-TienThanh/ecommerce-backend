@@ -50,16 +50,16 @@ export const login = catchAsyncErrors(async (req, res, next) => {
         email,
     ]);
     if (user.rows.length === 0) {
-        return next(new ErrorHandler('Invalid email or password', 401));
+        return next(new ErrorHandler('Tên đăng nhập hoặc mật khẩu sai', 401));
     }
     const isPasswordMatched = await bcrypt.compare(
         password,
         user.rows[0].password,
     );
     if (!isPasswordMatched) {
-        return next(new ErrorHandler('Invalid email or password', 401));
+        return next(new ErrorHandler('Tên đăng nhập hoặc mật khẩu sai', 401));
     }
-    sendToken(user.rows[0], 200, 'Logged in successfully', res);
+    sendToken(user.rows[0], 200, 'Đăng nhập thành công', res);
 });
 
 export const getUser = catchAsyncErrors(async (req, res, next) => {

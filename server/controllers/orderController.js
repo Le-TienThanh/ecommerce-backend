@@ -18,9 +18,9 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         !full_name ||
         !state ||
         !city ||
-        !country ||
+        // !country ||
         !address ||
-        !pincode ||
+        // !pincode ||
         !phone ||
         !orderedItems
     ) {
@@ -72,9 +72,9 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         );
         const offset = index * 6;
         const placeholder = `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`;
-       
+        placeholders.push(placeholder);
     });
-    const shipping_price = total_price > 500000 ? 0 : 50000;
+    const shipping_price = total_price > 1000000 ? 0 : 50000;
     total_price = Math.round(total_price + shipping_price);
     const orderResult = await database.query(
         'INSERT INTO orders (buyer_id, total_price, shipping_price) VALUES ($1, $2, $3) RETURNING *',
@@ -94,6 +94,7 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         'INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
         [orderId, full_name, state, city, country, address, pincode, phone],
     );
+    
     const paymentResponse = await generatePaymentIntent(orderId, total_price);
 
     if (!paymentResponse.success) {
@@ -176,7 +177,7 @@ export const fetchMyOrders = catchAsyncErrors(async (req, res, next) => {
         FROM orders o
         LEFT JOIN order_items oi ON o.id = oi.order_id
         LEFT JOIN shipping_info s ON o.id = s.order_id
-        WHERE o.buyer_id = $1
+        WHERE o.buyer_id = $1 AND o.paid_at IS NOT NULL
         GROUP BY o.id, s.id
 
         `,
@@ -214,6 +215,7 @@ export const fetchAllOrders = catchAsyncErrors(async (req, res, next) => {
         FROM orders o
         LEFT JOIN order_items oi ON o.id = oi.order_id
         LEFT JOIN shipping_info s ON o.id = s.order_id
+        WHERE o.paid_at IS NOT NULL
         GROUP BY o.id, s.id
 
         `)
@@ -250,10 +252,13 @@ export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
 
 export const deleteOrder = catchAsyncErrors(async (req, res, next) => {
     const { orderId } = req.params;
+   
+
     const result = await database.query(
-        'DELETE FROM orders WHERE id = $1',
+        'DELETE FROM orders WHERE id = $1 RETURNING *',
         [orderId],
     );
+    console.log(">>> check result: ", result)
     if(result.rows.length === 0){
         return next(new ErrorHandler('Invalid order ID.', 404));
     }

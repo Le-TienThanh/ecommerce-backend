@@ -13,6 +13,10 @@ import orderRouter from './router/orderRoutes.js';
 import Stripe from 'stripe';
 import database from './database/db.js';
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+
+
 const app = express();
 
 // config({ path: './config/config.env' });
@@ -25,6 +29,7 @@ app.use(
     }),
 );
 
+
 app.post(
     '/api/v1/payment/webhook',
     express.raw({ type: 'application/json' }),
@@ -32,17 +37,21 @@ app.post(
         const sig = req.headers['stripe-signature'];
         let event;
         try {
-            event = Stripe.webhooks.constructEvent(
+            
+            event = stripe.webhooks.constructEvent(
                 req.body,
                 sig,
                 process.env.STRIPE_WEBHOOK_SECRET,
             );
+            
         } catch (err) {
             return res.status(400).send(`Webhook Error: ${err.message || err}`);
         }
 
+        
         // Handing the Event
         if (event.type === 'payment_intent.succeeded') {
+            console.log("success");
             const paymentIntent_client_secret = event.data.object.client_secret;
             try {
                 // FINDING AND UPDATED PAYMENT
@@ -58,7 +67,7 @@ app.post(
 
                 // Reduce Stock For Each Product
                 const orderId = paymentTableUpdateResult.rows[0].order_id;
-                const { row: orderedItems } = await database.query(
+                const { rows: orderedItems } = await database.query(
                     'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
                     [orderId],
                 );

@@ -9,7 +9,7 @@ export async function createPaymentsTable() {
         payment_intent_id VARCHAR(255) UNIQUE,         
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,         
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE      
-         );`;
+        );`;
         await database.query(query);
     } catch (error) {
         console.error('Failed To Create Payments Table.', error);
