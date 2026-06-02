@@ -9,7 +9,7 @@ export const createProduct = catchAsyncErrors(async (req, res, next) => {
     const create_by = req.user.id;
     if (!name || !description || !price || !category || !stock) {
         return next(
-            new ErrorHandler('Please provide all required fields', 400),
+            new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
     }
     let uploadedImages = [];
@@ -47,7 +47,7 @@ export const createProduct = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(201).json({
         success: true,
-        message: 'Product created successfully',
+        message: 'Tạo sản phẩm thành công',
         product: product.rows[0],
     });
 });
@@ -178,7 +178,7 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
     const { name, description, price, category, stock } = req.body;
     if (!name || !description || !price || !category || !stock) {
         return next(
-            new ErrorHandler('Please provide all required fields', 400),
+            new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
     }
     const product = await database.query(
@@ -186,7 +186,7 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
         [productId],
     );
     if (product.rows.length === 0) {
-        return next(new ErrorHandler('Product not found', 404));
+        return next(new ErrorHandler('Không tìm thấy sản phẩm', 404));
     }
     const result = await database.query(
         `UPDATE products SET name = $1, description = $2, price = $3, category = $4, stock = $5 WHERE id = $6 RETURNING *`,
@@ -194,7 +194,7 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'Product updated successfully',
+        message: 'Cập nhật thông tin sản phẩm thành công',
         updatedProduct: result.rows[0],
     });
 });
@@ -206,7 +206,7 @@ export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
         [productId],
     );
     if (product.rows.length === 0) {
-        return next(new ErrorHandler('Product not found', 404));
+        return next(new ErrorHandler('Không tìm thấy sản phẩm', 404));
     }
     const images = product.rows[0].images;
     const deleteResult = await database.query(
@@ -215,7 +215,7 @@ export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
     );
 
     if (deleteResult.rows.length === 0) {
-        return next(new ErrorHandler('Failed to delete product', 500));
+        return next(new ErrorHandler('Xóa sản phẩm thất bại', 500));
     }
 
     // Delete images from Cloudinary
@@ -234,7 +234,7 @@ export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
 
     res.status(200).json({
         success: true,
-        message: 'Product deleted successfully',
+        message: 'Xóa sản phẩm thành công',
     });
 });
 
@@ -263,7 +263,7 @@ export const fetchSingleProduct = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'Product fetched successfully',
+        message: 'Lấy thông tin sản phẩm thành công',
         product: result.rows[0],
     });
 });
@@ -272,7 +272,7 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
     const { productId } = req.params;
     const { rating, comment } = req.body;
     if (!rating || !comment) {
-        return next(new ErrorHandler('Please provide rating and comment', 400));
+        return next(new ErrorHandler('Vui lòng cung cấp đánh giá và bình luận', 400));
     }
     const purchaseCheckQuery = `
         SELECT oi.product_id
@@ -293,7 +293,7 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
     if (rows.length === 0) {
         return res.status(403).json({
             success: false,
-            message: 'You can only review products you have purchased',
+            message: 'Bạn chỉ có thể đánh giá những sản phẩm đã mua',
         });
     }
     const product = await database.query(
@@ -302,7 +302,7 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
     );
 
     if (product.rows.length === 0) {
-        return next(new ErrorHandler('Product not found', 404));
+        return next(new ErrorHandler('Không tìm thấy sản phẩm', 404));
     }
     const isAlreadyReviewed = await database.query(
         `SELECT * FROM reviews WHERE user_id = $1 AND product_id = $2`,
@@ -331,7 +331,7 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'Review submitted successfully',
+        message: 'Gửi đánh giá thành công',
         review: review.rows[0],
         updatedProduct: updatedProduct.rows[0],
     });
@@ -344,7 +344,7 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
         [productId, req.user.id],
     );
     if (review.rows.length === 0) {
-        return next(new ErrorHandler('Review not found', 404));
+        return next(new ErrorHandler('Không tìm thấy đánh giá', 404));
     }
     const allReviews = await database.query(
         `SELECT AVG(rating) AS avg_rating FROM reviews WHERE product_id = $1`,
@@ -357,7 +357,7 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'Your review has been deleted.',
+        message: 'Đánh giá của bạn đã được xóa',
         review: review.rows[0],
         product: updatedProduct.rows[0],
     });
@@ -367,7 +367,7 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
     async (req, res, next) => {
         const { userPrompt } = req.body;
         if (!userPrompt) {
-            return next(new ErrorHandler('Please provide a prompt', 400));
+            return next(new ErrorHandler('Vui lòng nhập prompt', 400));
         }
         const filterKeywords = (query) => {
             const stopWords = new Set([
@@ -467,7 +467,7 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
         if (filteredProducts.length === 0) {
             return res.status(200).json({
                 success: true,
-                message: 'No products found matching your prompt',
+                message: 'Không tìm thấy sản phẩm phù hợp với prompt của bạn',
                 products: [],
             });
         }
@@ -479,14 +479,16 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
             );
             res.status(200).json({
                 success,
-                message: 'AI filtered products based on your prompt',
+                message: 'AI đã tìm thấy sản phẩm phù hợp với prompt của bạn',
                 products,
             });
         } catch (error) {
             console.log(error);
             return res.status(500).json({
                 success: false,
-                message: 'AI processing failed',
+                message: 'Tìm kiếm với AI thất bại',
+
+                
             });
         }
     },

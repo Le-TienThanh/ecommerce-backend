@@ -13,13 +13,13 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
         return next(
-            new ErrorHandler('Please provide all required fields', 400),
+            new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
     }
     if (password.length < 8 || password.length > 16) {
         return next(
             new ErrorHandler(
-                'Password must be between 8 and 16 characters',
+                'Mật khẩu phải từ 8 đến 16 ký tự',
                 400,
             ),
         );
@@ -30,7 +30,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     );
     if (isAlreadyRegistered.rows.length > 0) {
         return next(
-            new ErrorHandler('User already registered with this email', 400),
+            new ErrorHandler('Email đã tồn tại', 400),
         );
     }
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -38,13 +38,13 @@ export const register = catchAsyncErrors(async (req, res, next) => {
         'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
         [name, email, hashedPassword],
     );
-    sendToken(user.rows[0], 201, 'User registered successfully', res);
+    sendToken(user.rows[0], 201, 'Đăng ký thành công', res);
 });
 
 export const login = catchAsyncErrors(async (req, res, next) => {
     const { email, password } = req.body;
     if (!email || !password) {
-        return next(new ErrorHandler('Please provide email and password', 400));
+        return next(new ErrorHandler('Yêu cầu nhập đầy đủ Email và mật khẩu', 400));
     }
     const user = await database.query('SELECT * FROM users WHERE email = $1', [
         email,
@@ -79,7 +79,7 @@ export const logout = catchAsyncErrors(async (req, res, next) => {
         })
         .json({
             success: true,
-            message: 'Logged out successfully',
+            message: 'Đăng xuất thành công',
         });
 });
 
@@ -91,7 +91,7 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
         [email],
     );
     if (userResult.rows.length === 0) {
-        return next(new ErrorHandler('User not found with this email', 404));
+        return next(new ErrorHandler('Không tìm thấy người dùng với Email này', 404));
     }
     const user = userResult.rows[0];
     const { resetToken, hashedToken, resetPasswordExpire } =
@@ -111,7 +111,7 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
         });
         res.status(200).json({
             success: true,
-            message: `Email sent to ${user.email} successfully`,
+            message: `Email đã được gửi đến ${user.email}`,
         });
     } catch (error) {
         await database.query(
@@ -121,7 +121,7 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
         console.log('error: ', error);
         return next(
             new ErrorHandler(
-                'Failed to send email. Please try again later.',
+                'Gửi Email thất bại. Vui lòng thử lại sau',
                 500,
             ),
         );
@@ -146,7 +146,7 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
     }
 
     if (req.body.password !== req.body.confirmPassword) {
-        return next(new ErrorHandler('Password do not match', 400));
+        return next(new ErrorHandler('Mật khẩu không khớp', 400));
     }
     if (
         req.body.password?.length < 8 ||
@@ -156,7 +156,7 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
     ) {
         return next(
             new ErrorHandler(
-                'Password must be between 8 and 16 characters',
+                'Mật khẩu phải từ 8 đến 16 ký tự',
                 400,
             ),
         );
@@ -166,14 +166,14 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
         `UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expires = NULL WHERE id = $2 RETURNING *`,
         [hashedPassword, user.rows[0].id],
     );
-    sendToken(updateUser.rows[0], 200, 'Password reset successful', res);
+    sendToken(updateUser.rows[0], 200, 'Đặt lại mật khẩu thành công', res);
 });
 
 export const updatePassword = catchAsyncErrors(async (req, res, next) => {
     const { currentPassword, newPassword, confirmNewPassword } = req.body;
     if (!currentPassword || !newPassword || !confirmNewPassword) {
         return next(
-            new ErrorHandler('Please provide all required fields', 400),
+            new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
     }
     const isPasswordMatched = await bcrypt.compare(
@@ -181,12 +181,12 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
         req.user.password,
     );
     if (!isPasswordMatched) {
-        return next(new ErrorHandler('Current password is incorrect', 400));
+        return next(new ErrorHandler('Mật khẩu hiện tại không đúng', 400));
     }
     if (newPassword !== confirmNewPassword) {
         return next(
             new ErrorHandler(
-                'New password and confirm new password do not match',
+                'Mật khẩu mới và xác nhận mật khẩu mới không khớp',
                 400,
             ),
         );
@@ -199,7 +199,7 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
     ) {
         return next(
             new ErrorHandler(
-                'New password must be between 8 and 16 characters',
+                'Mật khẩu mới phải từ 8 đến 16 ký tự',
                 400,
             ),
         );
@@ -211,7 +211,7 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
     ]);
     res.status(200).json({
         success: true,
-        message: 'Password updated successfully',
+        message: 'Cập nhật mật khẩu thành công',
     });
 });
 
@@ -220,11 +220,11 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
    
     if (!name || !email) {
         return next(
-            new ErrorHandler('Please provide all required fields', 400),
+            new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
     }
     if (name.trim().length === 0 || email.trim().length === 0) {
-        return next(new ErrorHandler('Name and email cannot be empty', 400));
+        return next(new ErrorHandler('Tên và Email không được để trống', 400));
     }
     let avatarData = {};
  
@@ -261,7 +261,7 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     }
     res.status(200).json({
         success: true,
-        message: 'Profile updated successfully',
+        message: 'Cập nhật hồ sơ thành công',
         user: user.rows[0],
     });
 });

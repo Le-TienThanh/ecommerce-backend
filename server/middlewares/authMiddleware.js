@@ -8,7 +8,7 @@ export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
 
     if (!token) {
         return next(
-            new ErrorHandler('Please login to access this resource', 401),
+            new ErrorHandler('Vui lòng đăng nhập để truy cập tài nguyên này', 401),
         );
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
@@ -26,7 +26,7 @@ export const authorizedRoles = (...roles) => {
         if (!roles.includes(req.user.role)) {
             return next(
                 new ErrorHandler(
-                    `Role: ${req.user.role} is not allowed to access this resource`,
+                    `Vai trò: ${req.user.role} không được phép truy cập tài nguyên này`,
                     403,
                 ),
             );

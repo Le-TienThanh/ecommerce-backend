@@ -25,14 +25,14 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         !orderedItems
     ) {
         return next(
-            new ErrorHandler('Please provide complete shipping details.', 400),
+            new ErrorHandler('Vui lòng cung cấp đầy đủ thông tin giao hàng', 400),
         );
     }
     const items = Array.isArray(orderedItems)
         ? orderedItems
         : JSON.parse(orderedItems);
     if (!items || items.length === 0) {
-        return next(new ErrorHandler('No items in cart.', 400));
+        return next(new ErrorHandler('Không có sản phẩm nào trong giỏ hàng', 400));
     }
     const productIds = items.map((item) => item.product.id);
     const { rows: products } = await database.query(
@@ -47,7 +47,7 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         if (!product) {
             return next(
                 new ErrorHandler(
-                    `Product not found for ID: ${item.product.id}.`,
+                    `Không tìm thấy sản phẩm với ID: ${item.product.id}`,
                     404,
                 ),
             );
@@ -55,7 +55,7 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         if (item.quantity > product.stock) {
             return next(
                 new ErrorHandler(
-                    `Only ${product.stock} units of ${product.name} available.`,
+                    `Chỉ còn ${product.stock} sản phẩm ${product.name} trong kho`,
                     400,
                 ),
             );
@@ -98,11 +98,11 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
     const paymentResponse = await generatePaymentIntent(orderId, total_price);
 
     if (!paymentResponse.success) {
-        return next(new ErrorHandler('Payment failed. Try again.', 500));
+        return next(new ErrorHandler('Thanh toán thất bại. Vui lòng thử lại.', 500));
     }
     res.status(200).json({
         success: true,
-        message: 'Order placed successfully. Please proceed to payment.',
+        message: 'Đặt hàng thành công. Vui lòng tiến hành thanh toán.',
         paymentIntent: paymentResponse.clientSecret,
         total_price,
     });
@@ -144,7 +144,7 @@ export const fetchSingleOrder = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'Order fetched successfully.',
+        message: 'Lấy thông tin đơn hàng thành công',
         orders: result.rows[0],
     });
 });
@@ -185,7 +185,7 @@ export const fetchMyOrders = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'All your orders fetched successfully.',
+        message: 'Thông tin tất cả đơn hàng của bạn đã lấy thành công',
         myOrders: result.rows,
     });
 });
@@ -221,7 +221,7 @@ export const fetchAllOrders = catchAsyncErrors(async (req, res, next) => {
         `)
         res.status(200).json({
             success: true,
-            message: 'All orders fetched successfully.',
+            message: 'Đã lấy tất cả thông tin các đơn hàng',
             orders: result.rows,
         });
 });
@@ -229,7 +229,7 @@ export const fetchAllOrders = catchAsyncErrors(async (req, res, next) => {
 export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
     const {status   } = req.body;
     if(!status){
-        return next(new ErrorHandler('Please provide a valid status.', 400));
+        return next(new ErrorHandler('Vui lòng cung cấp trạng thái hợp lệ', 400));
     }
     const { orderId } = req.params;
     const result = await database.query(
@@ -237,7 +237,7 @@ export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
         [orderId],
     );
     if (result.rows.length === 0) {
-        return next(new ErrorHandler('Invalid order ID.', 404));
+        return next(new ErrorHandler('ID đơn hàng không hợp lệ', 404));
     }
     const updatedOrder = await database.query(
         'UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *',
@@ -245,7 +245,7 @@ export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
     );
     res.status(200).json({
         success: true,
-        message: 'Order status updated successfully.',
+        message: 'Cập nhật trạng thái đơn hàng thành công',
         updatedOrder: updatedOrder.rows[0],
     });
 });
@@ -258,13 +258,12 @@ export const deleteOrder = catchAsyncErrors(async (req, res, next) => {
         'DELETE FROM orders WHERE id = $1 RETURNING *',
         [orderId],
     );
-    console.log(">>> check result: ", result)
     if(result.rows.length === 0){
-        return next(new ErrorHandler('Invalid order ID.', 404));
+        return next(new ErrorHandler('ID đơn hàng không hợp lệ', 404));
     }
     res.status(200).json({
         success: true,
-        message: 'Order deleted successfully.',
+        message: 'Xóa đơn hàng thành công',
         order: result.rows[0],
     });
 });

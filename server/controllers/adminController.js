@@ -30,7 +30,7 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
         [id],
     );
     if (deleteUser.rows.length === 0) {
-        return next(new ErrorHandler('User not found', 404));
+        return next(new ErrorHandler('Không tìm thấy người dùng', 404));
     }
     const avatar = deleteUser.rows[0].avatar;
     if (avatar?.public_id) {
@@ -38,7 +38,7 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
     }
     res.status(200).json({
         success: true,
-        message: 'User deleted successfully',
+        message: 'Xóa người dùng thành công',
     });
 });
 

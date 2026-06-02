@@ -5,18 +5,18 @@ class ErrorHandler extends Error {
     }
 }
 export const errorMiddleware = (err, req, res, next) => {
-    err.message = err.message || 'Internal Server Error';
+    err.message = err.message || 'Lỗi máy chủ nội bộ';
     err.statusCode = err.statusCode || 500;
     if (err.code === 11000) {
-        const message = 'Duplicate field value entered';
+        const message = 'Giá trị trường trùng lặp đã được nhập';
         err = new ErrorHandler(message, 400);
     }
     if (err.name === 'JsonWebTokenError') {
-        const message = 'JSON Web Token is invalid, try again';
+        const message = 'JSON Web Token không hợp lệ, vui lòng thử lại';
         err = new ErrorHandler(message, 400);
     }
     if (err.name === 'TokenExpiredError') {
-        const message = 'JSON Web Token is expired, try again';
+        const message = 'JSON Web Token đã hết hạn, vui lòng thử lại';
         err = new ErrorHandler(message, 400);
     }
     const errorMessage = err.errors
