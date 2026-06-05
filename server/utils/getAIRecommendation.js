@@ -20,7 +20,6 @@ export async function getAIRecommendation(userPrompt, products) {
     });
 
     const data = await response.json();
-    console.log("data: ", data)
 
     const aiResponseText =
         data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';

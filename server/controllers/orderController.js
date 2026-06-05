@@ -25,15 +25,21 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         !orderedItems
     ) {
         return next(
-            new ErrorHandler('Vui lòng cung cấp đầy đủ thông tin giao hàng', 400),
+            new ErrorHandler(
+                'Vui lòng cung cấp đầy đủ thông tin giao hàng',
+                400,
+            ),
         );
     }
     const items = Array.isArray(orderedItems)
         ? orderedItems
         : JSON.parse(orderedItems);
     if (!items || items.length === 0) {
-        return next(new ErrorHandler('Không có sản phẩm nào trong giỏ hàng', 400));
+        return next(
+            new ErrorHandler('Không có sản phẩm nào trong giỏ hàng', 400),
+        );
     }
+
     const productIds = items.map((item) => item.product.id);
     const { rows: products } = await database.query(
         'SELECT id, price, stock, name FROM products WHERE id = ANY($1::uuid[])',
@@ -91,14 +97,16 @@ export const placeNewOrder = catchAsyncErrors(async (req, res, next) => {
         values,
     );
     await database.query(
-        'INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-        [orderId, full_name, state, city, country, address, pincode, phone],
+        'INSERT INTO shipping_info (order_id, full_name, state, city, address, phone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [orderId, full_name, state, city, address, phone],
     );
-    
+
     const paymentResponse = await generatePaymentIntent(orderId, total_price);
 
     if (!paymentResponse.success) {
-        return next(new ErrorHandler('Thanh toán thất bại. Vui lòng thử lại.', 500));
+        return next(
+            new ErrorHandler('Thanh toán thất bại. Vui lòng thử lại.', 500),
+        );
     }
     res.status(200).json({
         success: true,
@@ -169,9 +177,7 @@ export const fetchMyOrders = catchAsyncErrors(async (req, res, next) => {
         'full_name', s.full_name,
         'state', s.state,
         'city', s.city,
-        'country', s.country,
         'address', s.address,
-        'pincode', s.pincode,
         'phone', s.phone
         ) AS shipping_info 
         FROM orders o
@@ -207,9 +213,7 @@ export const fetchAllOrders = catchAsyncErrors(async (req, res, next) => {
         'full_name', s.full_name,
         'state', s.state,
         'city', s.city,
-        'country', s.country,
         'address', s.address,
-        'pincode', s.pincode,
         'phone', s.phone 
         ) AS shipping_info
         FROM orders o
@@ -218,24 +222,25 @@ export const fetchAllOrders = catchAsyncErrors(async (req, res, next) => {
         WHERE o.paid_at IS NOT NULL
         GROUP BY o.id, s.id
 
-        `)
-        res.status(200).json({
-            success: true,
-            message: 'Đã lấy tất cả thông tin các đơn hàng',
-            orders: result.rows,
-        });
+        `);
+    res.status(200).json({
+        success: true,
+        message: 'Đã lấy tất cả thông tin các đơn hàng',
+        orders: result.rows,
+    });
 });
 
 export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
-    const {status   } = req.body;
-    if(!status){
-        return next(new ErrorHandler('Vui lòng cung cấp trạng thái hợp lệ', 400));
+    const { status } = req.body;
+    if (!status) {
+        return next(
+            new ErrorHandler('Vui lòng cung cấp trạng thái hợp lệ', 400),
+        );
     }
     const { orderId } = req.params;
-    const result = await database.query(
-        'SELECT * FROM orders WHERE id = $1',
-        [orderId],
-    );
+    const result = await database.query('SELECT * FROM orders WHERE id = $1', [
+        orderId,
+    ]);
     if (result.rows.length === 0) {
         return next(new ErrorHandler('ID đơn hàng không hợp lệ', 404));
     }
@@ -252,13 +257,12 @@ export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
 
 export const deleteOrder = catchAsyncErrors(async (req, res, next) => {
     const { orderId } = req.params;
-   
 
     const result = await database.query(
         'DELETE FROM orders WHERE id = $1 RETURNING *',
         [orderId],
     );
-    if(result.rows.length === 0){
+    if (result.rows.length === 0) {
         return next(new ErrorHandler('ID đơn hàng không hợp lệ', 404));
     }
     res.status(200).json({

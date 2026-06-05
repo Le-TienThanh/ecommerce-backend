@@ -7,7 +7,7 @@ import { getAIRecommendation } from '../utils/getAIRecommendation.js';
 export const createProduct = catchAsyncErrors(async (req, res, next) => {
     const { name, description, price, category, stock } = req.body;
     const create_by = req.user.id;
-    if (!name || !description || !price || !category || !stock) {
+    if (!name  || !price || !category || !stock) {
         return next(
             new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
@@ -163,7 +163,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     `;
 
     const topRatedResult = await database.query(topRatedQuery);
-
+    
     res.status(200).json({
         success: true,
         products: result.rows,
