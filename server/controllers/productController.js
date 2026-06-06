@@ -3,11 +3,13 @@ import ErrorHandler from '../middlewares/errorMiddleware.js';
 import database from '../database/db.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { getAIRecommendation } from '../utils/getAIRecommendation.js';
+import removeAccents from 'remove-accents';
+import { extractSearchIntent, rankProducts } from '../utils/aiSearch.js';
 
 export const createProduct = catchAsyncErrors(async (req, res, next) => {
     const { name, description, price, category, stock } = req.body;
     const create_by = req.user.id;
-    if (!name  || !price || !category || !stock) {
+    if (!name || !price || !category || !stock) {
         return next(
             new ErrorHandler('Vui lòng nhập đầy đủ thông tin các trường', 400),
         );
@@ -54,10 +56,11 @@ export const createProduct = catchAsyncErrors(async (req, res, next) => {
 
 export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     const { availability, price, category, ratings, search } = req.query;
-    const page = parseInt(req.query.page) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
     
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = 9;
+    const offset = (page - 1) * limit;
 
     let conditions = [];
     let values = [];
@@ -74,15 +77,13 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     }
     // Filter products by price
     if (price) {
-
         const [minPrice, maxPrice] = price.split('-').map(Number);
-      
+
         if (!isNaN(minPrice) && !isNaN(maxPrice)) {
             conditions.push(`price BETWEEN $${index} AND $${index + 1}`);
             values.push(minPrice, maxPrice);
             index += 2;
         }
-
     }
 
     // Filter products by category
@@ -163,7 +164,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     `;
 
     const topRatedResult = await database.query(topRatedQuery);
-    
+
     res.status(200).json({
         success: true,
         products: result.rows,
@@ -272,7 +273,9 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
     const { productId } = req.params;
     const { rating, comment } = req.body;
     if (!rating || !comment) {
-        return next(new ErrorHandler('Vui lòng cung cấp đánh giá và bình luận', 400));
+        return next(
+            new ErrorHandler('Vui lòng cung cấp đánh giá và bình luận', 400),
+        );
     }
     const purchaseCheckQuery = `
         SELECT oi.product_id
@@ -363,132 +366,442 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
     });
 });
 
+// export const fetchAIFilteredProducts = catchAsyncErrors(
+//     async (req, res, next) => {
+//         const { userPrompt } = req.body;
+//         if (!userPrompt) {
+//             return next(new ErrorHandler('Vui lòng nhập prompt', 400));
+//         }
+//         const filterKeywords = (query) => {
+//             const stopWords = new Set([
+//                 'the',
+//                 'they',
+//                 'them',
+//                 'then',
+//                 'I',
+//                 'we',
+//                 'you',
+//                 'he',
+//                 'she',
+//                 'it',
+//                 'is',
+//                 'a',
+//                 'an',
+//                 'of',
+//                 'and',
+//                 'or',
+//                 'to',
+//                 'for',
+//                 'from',
+//                 'on',
+//                 'who',
+//                 'whom',
+//                 'why',
+//                 'when',
+//                 'which',
+//                 'with',
+//                 'this',
+//                 'that',
+//                 'in',
+//                 'at',
+//                 'by',
+//                 'be',
+//                 'not',
+//                 'was',
+//                 'were',
+//                 'has',
+//                 'have',
+//                 'had',
+//                 'do',
+//                 'does',
+//                 'did',
+//                 'so',
+//                 'some',
+//                 'any',
+//                 'how',
+//                 'can',
+//                 'could',
+//                 'should',
+//                 'would',
+//                 'there',
+//                 'here',
+//                 'just',
+//                 'than',
+//                 'because',
+//                 'but',
+//                 'its',
+//                 "it's",
+//                 'if',
+//                 '.',
+//                 ',',
+//                 '!',
+//                 '?',
+//                 '>',
+//                 '<',
+//                 ';',
+//                 '`',
+//                 '1',
+//                 '2',
+//                 '3',
+//                 '4',
+//                 '5',
+//                 '6',
+//                 '7',
+//                 '8',
+//                 '9',
+//                 '10',
+//             ]);
+//             return query
+//                 .toLowerCase()
+//                 .replace(/[^\w\s]/g, '')
+//                 .split(/\s+/)
+//                 .filter((word) => !stopWords.has(word))
+//                 .map((word) => `%${word}%`);
+//         };
+//         const keywords = filterKeywords(userPrompt);
+//         // STEP 1: Basic SQL Filtering
+//         const result = await database.query(
+//             `SELECT * FROM products WHERE name ILIKE ANY($1) OR description ILIKE ANY($1)
+//             OR category ILIKE ANY($1)
+//             LIMIT 200`,
+//             [keywords],
+//         );
+//         const filteredProducts = result.rows;
+//         if (filteredProducts.length === 0) {
+//             return res.status(200).json({
+//                 success: true,
+//                 message: 'Không tìm thấy sản phẩm phù hợp với prompt của bạn',
+//                 products: [],
+//             });
+//         }
+//         // STEP 2: AI FILTERING
+//         try {
+//             const { success, products } = await getAIRecommendation(
+//                 userPrompt,
+//                 filteredProducts,
+//             );
+//             res.status(200).json({
+//                 success,
+//                 message: 'AI đã tìm thấy sản phẩm phù hợp với prompt của bạn',
+//                 products,
+//             });
+//         } catch (error) {
+//             console.log(error);
+//             return res.status(500).json({
+//                 success: false,
+//                 message: 'Tìm kiếm với AI thất bại',
+
+//             });
+//         }
+//     },
+// );
+
+// chat gpt
+// export const fetchAIFilteredProducts = catchAsyncErrors(
+//     async (req, res, next) => {
+//         const { userPrompt } = req.body;
+//         console.log('fetch line 501');
+
+//         if (!userPrompt?.trim()) {
+//             return next(
+//                 new ErrorHandler('Vui lòng nhập nội dung tìm kiếm', 400),
+//             );
+//         }
+
+//         try {
+
+//             const intent = await extractSearchIntent(userPrompt);
+
+//             const { category, keywords, minPrice, maxPrice } = intent;
+
+//             let query = `
+//                 SELECT
+//                     id,
+//                     name,
+//                     description,
+//                     category,
+//                     price,
+//                     images
+//                 FROM products
+//                 WHERE 1=1
+//             `;
+
+//             const values = [];
+//             let paramIndex = 1;
+
+//             // Danh mục
+//             if (category) {
+//                 query += `
+//                     AND category ILIKE $${paramIndex}
+//                 `;
+
+//                 values.push(`%${category}%`);
+//                 paramIndex++;
+//             }
+
+//             // Giá tối thiểu
+//             if (minPrice !== null) {
+//                 query += `
+//                     AND price >= $${paramIndex}
+//                 `;
+
+//                 values.push(minPrice);
+//                 paramIndex++;
+//             }
+
+//             // Giá tối đa
+//             if (maxPrice !== null) {
+//                 query += `
+//                     AND price <= $${paramIndex}
+//                 `;
+
+//                 values.push(maxPrice);
+//                 paramIndex++;
+//             }
+//             console.log('fetch line 560');
+
+//             // Keywords
+//             if (keywords && Array.isArray(keywords) && keywords.length) {
+//                 const patterns = keywords.map((keyword) => {
+//                     const normalizedKeyword = removeAccents(
+//                         keyword.toLowerCase(),
+//                     );
+
+//                     return `%${normalizedKeyword}%`;
+//                 });
+
+//                 query += `
+//                     AND (
+//                         LOWER(
+//                             unaccent(name)
+//                         ) ILIKE ANY($${paramIndex})
+
+//                         OR
+
+//                         LOWER(
+//                             unaccent(description)
+//                         ) ILIKE ANY($${paramIndex})
+//                     )
+//                 `;
+
+//                 values.push(patterns);
+//                 paramIndex++;
+//             }
+
+//             query += `
+//                 ORDER BY created_at DESC
+//                 LIMIT 30
+//             `;
+
+//             const result = await database.query(query, values);
+
+//             const products = result.rows;
+
+//             if (!products.length) {
+//                 return res.status(200).json({
+//                     success: true,
+//                     message: 'Không tìm thấy sản phẩm phù hợp',
+//                     products: [],
+//                 });
+//             }
+
+//             const simplifiedProducts = products.map((product) => ({
+//                 id: product.id,
+//                 name: product.name,
+//                 description: product.description,
+//                 category: product.category,
+//                 price: product.price,
+//                 images: product.images,
+//             }));
+
+//             const rankedProducts = await rankProducts(
+//                 userPrompt,
+//                 simplifiedProducts,
+//             );
+
+//             return res.status(200).json({
+//                 success: true,
+//                 message: 'AI đã tìm thấy sản phẩm phù hợp',
+//                 products: rankedProducts,
+//             });
+//         } catch (error) {
+//             console.error(error);
+
+//             return res.status(500).json({
+//                 success: false,
+//                 message: 'Tìm kiếm sản phẩm bằng AI thất bại',
+//             });
+//         }
+//     },
+// );
+
 export const fetchAIFilteredProducts = catchAsyncErrors(
     async (req, res, next) => {
         const { userPrompt } = req.body;
-        if (!userPrompt) {
-            return next(new ErrorHandler('Vui lòng nhập prompt', 400));
+
+        if (!userPrompt?.trim()) {
+            return next(
+                new ErrorHandler('Vui lòng nhập nội dung tìm kiếm', 400),
+            );
         }
-        const filterKeywords = (query) => {
-            const stopWords = new Set([
-                'the',
-                'they',
-                'them',
-                'then',
-                'I',
-                'we',
-                'you',
-                'he',
-                'she',
-                'it',
-                'is',
-                'a',
-                'an',
-                'of',
-                'and',
-                'or',
-                'to',
-                'for',
-                'from',
-                'on',
-                'who',
-                'whom',
-                'why',
-                'when',
-                'which',
-                'with',
-                'this',
-                'that',
-                'in',
-                'at',
-                'by',
-                'be',
-                'not',
-                'was',
-                'were',
-                'has',
-                'have',
-                'had',
-                'do',
-                'does',
-                'did',
-                'so',
-                'some',
-                'any',
-                'how',
-                'can',
-                'could',
-                'should',
-                'would',
-                'there',
-                'here',
-                'just',
-                'than',
-                'because',
-                'but',
-                'its',
-                "it's",
-                'if',
-                '.',
-                ',',
-                '!',
-                '?',
-                '>',
-                '<',
-                ';',
-                '`',
-                '1',
-                '2',
-                '3',
-                '4',
-                '5',
-                '6',
-                '7',
-                '8',
-                '9',
-                '10',
-            ]);
-            return query
-                .toLowerCase()
-                .replace(/[^\w\s]/g, '')
-                .split(/\s+/)
-                .filter((word) => !stopWords.has(word))
-                .map((word) => `%${word}%`);
-        };
-        const keywords = filterKeywords(userPrompt);
-        // STEP 1: Basic SQL Filtering
-        const result = await database.query(
-            `SELECT * FROM products WHERE name ILIKE ANY($1) OR description ILIKE ANY($1) 
-            OR category ILIKE ANY($1)
-            LIMIT 200`,
-            [keywords],
-        );
-        const filteredProducts = result.rows;
-        if (filteredProducts.length === 0) {
+
+        try {
+            const intent = await extractSearchIntent(userPrompt);
+            console.log('[debug] intent:', intent);
+            const { category, keywords, minPrice, maxPrice } = intent;
+
+            // ─── Xây dựng câu query ───────────────────────────────────────
+            let query = `
+                SELECT
+                    id,
+                    name,
+                    description,
+                    category,
+                    price,
+                    images,
+                    stock
+                FROM products
+                WHERE 1=1
+                  AND stock > 0
+            `;
+
+            const values = [];
+            let paramIndex = 1;
+
+            // Danh mục
+            if (category) {
+                query += ` AND category ILIKE $${paramIndex}`;
+                values.push(`%${category}%`);
+                paramIndex++;
+            }
+
+            // Giá tối thiểu
+            if (minPrice !== null && minPrice !== undefined) {
+                query += ` AND price >= $${paramIndex}`;
+                values.push(minPrice);
+                paramIndex++;
+            }
+
+            // Giá tối đa
+            if (maxPrice !== null && maxPrice !== undefined) {
+                query += ` AND price <= $${paramIndex}`;
+                values.push(maxPrice);
+                paramIndex++;
+            }
+
+            // Keywords — để unaccent() trong PostgreSQL tự xử lý dấu tiếng Việt
+            // KHÔNG dùng removeAccents() ở JS vì sẽ xung đột với unaccent() của DB
+            if (Array.isArray(keywords) && keywords.length > 0) {
+                const patterns = keywords.flatMap((kw) => {
+                    const normalized = removeAccents(kw.toLowerCase());
+                    const words = normalized.split(' ').filter(Boolean);
+
+                    console.log('[debug] kw:', kw);
+                    console.log('[debug] normalized:', normalized);
+                    console.log('[debug] words:', words);
+                    console.log(
+                        '[debug] patterns:',
+                        words.length > 1
+                            ? [...words.map((w) => `%${w}%`), `%${normalized}%`]
+                            : [`%${normalized}%`],
+                    );
+
+                    return words.length > 1
+                        ? [...words.map((w) => `%${w}%`), `%${normalized}%`]
+                        : [`%${normalized}%`];
+                });
+
+                console.log('[debug] Final patterns:', patterns);
+                console.log(
+                    '[debug] Query keywords part sẽ dùng ILIKE ANY:',
+                    patterns,
+                );
+
+                query += `
+        AND (
+            LOWER(unaccent(name))        ILIKE ANY($${paramIndex})
+            OR
+            LOWER(unaccent(description)) ILIKE ANY($${paramIndex})
+        )
+    `;
+
+                values.push(patterns);
+                paramIndex++;
+            }
+
+            query += ` ORDER BY created_at DESC LIMIT 30`;
+
+            // ─── Truy vấn DB ──────────────────────────────────────────────
+            const result = await database.query(query, values);
+            const products = result.rows;
+
+            if (products.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'Không tìm thấy sản phẩm phù hợp',
+                    products: [],
+                });
+            }
+
+            const simplifiedProducts = products.map(
+                ({
+                    id,
+                    name,
+                    description,
+                    category,
+                    price,
+                    images,
+                    stock,
+                }) => ({
+                    id,
+                    name,
+                    description,
+                    category,
+                    price,
+                    images,
+                    stock,
+                }),
+            );
+
+            // ─── AI Ranking ───────────────────────────────────────────────
+            // const aiRanked = await rankProducts(userPrompt, simplifiedProducts);
+
+            // // Merge: lấy thứ tự từ AI nhưng data đầy đủ từ DB
+            // const productMap = new Map(
+            //     simplifiedProducts.map((p) => [String(p.id), p]),
+            // );
+
+            // const finalProducts =
+            //     Array.isArray(aiRanked) && aiRanked.length > 0
+            //         ? aiRanked
+            //               .map((item) => productMap.get(String(item.id)))
+            //               .filter(Boolean) // loại bỏ id không tồn tại
+            //         : simplifiedProducts.slice(0, 10);
+
+            const aiRanked = await rankProducts(userPrompt, simplifiedProducts);
+
+            const productMap = new Map(
+                simplifiedProducts.map((p) => [String(p.id), p]),
+            );
+
+            const finalProducts =
+                Array.isArray(aiRanked) && aiRanked.length > 0
+                    ? aiRanked
+                          .map((item) => productMap.get(String(item.id)))
+                          .filter(Boolean) // ← loại bỏ id AI bịa ra
+                    : simplifiedProducts.slice(0, 10);
+
             return res.status(200).json({
                 success: true,
-                message: 'Không tìm thấy sản phẩm phù hợp với prompt của bạn',
-                products: [],
-            });
-        }
-        // STEP 2: AI FILTERING
-        try {
-            const { success, products } = await getAIRecommendation(
-                userPrompt,
-                filteredProducts,
-            );
-            res.status(200).json({
-                success,
-                message: 'AI đã tìm thấy sản phẩm phù hợp với prompt của bạn',
-                products,
+                message: 'AI đã tìm thấy sản phẩm phù hợp',
+                products: finalProducts,
             });
         } catch (error) {
-            console.log(error);
+            console.error('[fetchAIFilteredProducts]', error);
+
             return res.status(500).json({
                 success: false,
-                message: 'Tìm kiếm với AI thất bại',
-
-                
+                message: 'Tìm kiếm sản phẩm bằng AI thất bại',
             });
         }
     },
